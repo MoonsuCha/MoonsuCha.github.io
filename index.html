@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>arXiv 논문 요약기 (저자 정보)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .loader {
+            border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%;
+            width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto;
+        }
+        .loader-small {
+             border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%;
+             width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; margin-left: 4px; vertical-align: middle;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .section-title {
+             font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;
+             color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.25rem;
+        }
+        .info-text { color: #374151; line-height: 1.625; }
+        .notice-text {
+            color: #6b7280; font-style: italic; font-size: 0.875rem;
+            background-color: #f9fafb; padding: 0.75rem; border-radius: 0.375rem; border: 1px solid #e5e7eb; margin-top: 0.5rem;
+        }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .message-area { min-height: 24px; margin-top: 0.5rem; }
+        .success-message { color: #059669; font-size: 0.875rem; }
+        .error-message-inline { color: #dc2626; font-size: 0.875rem; }
+        /* 찾은 링크 목록 스타일 */
+        .found-links-list button {
+            display: block; width: 100%; text-align: left;
+            padding: 0.5rem 0.75rem; margin-bottom: 0.25rem;
+            border: 1px solid #e5e7eb; border-radius: 0.375rem;
+            background-color: white; cursor: pointer;
+            transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+            font-size: 0.875rem; color: #374151;
+            line-height: 1.4;
+        }
+        .found-links-list button .title { font-weight: 500; display: block; margin-bottom: 0.1rem;}
+        .found-links-list button .url { font-size: 0.8rem; color: #6b7280; word-break: break-all; }
+        .found-links-list button:hover { background-color: #f9fafb; }
+        .found-links-list button:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5); }
+        .found-links-list button.selected { background-color: #eff6ff; border-color: #3b82f6; }
+        .found-links-list button.selected .title { color: #1d4ed8; }
+        .found-links-list button.selected .url { color: #3b82f6; }
+        /* 바로가기 링크 버튼 스타일 */
+        .link-button {
+             display: inline-block;
+             font-weight: 600; /* font-semibold */
+             padding: 0.25rem 0.75rem; /* py-1 px-3 */
+             border-radius: 0.375rem; /* rounded-md */
+             font-size: 0.875rem; /* text-sm */
+             transition: background-color 0.15s ease-in-out;
+             text-decoration: none; /* 링크 밑줄 제거 */
+        }
+        .link-button-abs { background-color: #e5e7eb; color: #374151; } /* bg-gray-200 text-gray-800 */
+        .link-button-abs:hover { background-color: #d1d5db; } /* hover:bg-gray-300 */
+        .link-button-pdf { background-color: #fee2e2; color: #991b1b; } /* bg-red-200 text-red-800 */
+        .link-button-pdf:hover { background-color: #fecaca; } /* hover:bg-red-300 */
+        .link-button-html { background-color: #dbeafe; color: #1e40af; } /* bg-blue-200 text-blue-800 */
+        .link-button-html:hover { background-color: #bfdbfe; } /* hover:bg-blue-300 */
+
+    </style>
+</head>
+<body class="bg-gray-100 p-6 md:p-10 min-h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-2xl">
+        <h1 class="text-2xl font-bold mb-6 text-center text-gray-800">arXiv 논문 요약기</h1>
+
+        <div class="mb-6 border-b pb-6">
+            <label for="website-url" class="block text-sm font-medium text-gray-700 mb-2">웹사이트 주소 (선택 사항):</label>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input type="url" id="website-url" placeholder="예: https://some-research-lab.org" class="flex-grow p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition duration-150 ease-in-out">
+                <button id="fetch-website-button" class="bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-5 rounded-md transition duration-150 ease-in-out flex items-center justify-center gap-2 whitespace-nowrap">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                    <span>웹사이트에서 arXiv 찾기</span>
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">⚠️ <strong class="font-semibold">주의:</strong> 이 기능은 대상 웹사이트의 CORS 정책 허용 시에만 작동하며, 대부분의 경우 실패할 수 있습니다.</p>
+            <div id="website-message-area" class="message-area">
+                 <div id="website-loading" class="text-center my-1 hidden">
+                     <div class="loader !w-5 !h-5 !border-2 !border-t-teal-500 mx-auto"></div>
+                     <p class="text-xs text-gray-500 mt-1">웹사이트 내용을 분석 중...</p>
+                 </div>
+                 <div id="website-status-message" class="text-sm"></div>
+            </div>
+            <div id="website-found-links-area" class="mt-3 hidden">
+                <p class="text-sm font-medium text-gray-700 mb-1">찾은 arXiv 링크 (제목 로딩 중...):</p>
+                <div id="website-found-links-list" class="found-links-list max-h-32 overflow-y-auto border rounded-md p-2 bg-gray-50">
+                    </div>
+            </div>
+        </div>
+
+        <div class="mb-6 border-b pb-6">
+            <label for="github-url" class="block text-sm font-medium text-gray-700 mb-2">GitHub 저장소 주소 (선택 사항):</label>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input type="url" id="github-url" placeholder="예: https://github.com/owner/repo" class="flex-grow p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-150 ease-in-out">
+                <button id="fetch-readme-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-5 rounded-md transition duration-150 ease-in-out flex items-center justify-center gap-2 whitespace-nowrap">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+                    <span>README에서 arXiv 찾기</span>
+                </button>
+            </div>
+            <div id="github-message-area" class="message-area">
+                 <div id="github-loading" class="text-center my-1 hidden">
+                     <div class="loader !w-5 !h-5 !border-2 !border-t-indigo-500 mx-auto"></div>
+                     <p class="text-xs text-gray-500 mt-1">README 파일을 분석 중...</p>
+                 </div>
+                 <div id="github-status-message" class="text-sm"></div>
+            </div>
+             <div id="github-found-links-area" class="mt-3 hidden">
+                <p class="text-sm font-medium text-gray-700 mb-1">찾은 arXiv 링크 (제목 로딩 중...):</p>
+                <div id="github-found-links-list" class="found-links-list max-h-32 overflow-y-auto border rounded-md p-2 bg-gray-50">
+                    </div>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <label for="arxiv-url" class="block text-sm font-medium text-gray-700 mb-2">arXiv 논문 주소 (선택됨):</label>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input type="url" id="arxiv-url" placeholder="위 목록에서 링크를 선택하세요" class="flex-grow p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-150 ease-in-out bg-gray-50" readonly>
+                <button id="fetch-button" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-5 rounded-md transition duration-150 ease-in-out flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    <span>정보 가져오기</span> </button>
+            </div>
+             <p class="text-xs text-gray-500 mt-1">웹사이트/GitHub 분석 후 위 목록에서 링크를 클릭하여 선택하세요.</p>
+        </div>
+
+        <div id="loading" class="text-center my-4 hidden">
+             <div class="loader"></div>
+             <p class="text-sm text-gray-600 mt-2">논문 정보를 불러오는 중...</p>
+        </div>
+
+        <div id="error-message" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative my-4 hidden" role="alert">
+            <strong class="font-bold">오류:</strong>
+            <span class="block sm:inline" id="error-text"></span>
+        </div>
+
+        <div id="results" class="mt-8 space-y-6 hidden">
+            <div>
+                <h2 class="section-title">제목</h2>
+                <p id="paper-title" class="info-text"></p>
+            </div>
+            <div>
+                <h2 class="section-title">저자</h2>
+                <p id="paper-authors" class="info-text"></p>
+            </div>
+            <div>
+                <h2 class="section-title">초록 (Abstract)</h2>
+                <p id="paper-abstract" class="info-text"></p>
+            </div>
+            <div>
+                <h2 class="section-title">바로가기 링크</h2>
+                <div class="flex flex-wrap gap-2"> <a id="link-abs" href="#" target="_blank" class="link-button link-button-abs">Abs</a>
+                    <a id="link-pdf" href="#" target="_blank" class="link-button link-button-pdf">PDF</a>
+                    <a id="link-html" href="#" target="_blank" class="link-button link-button-html">HTML (ar5iv)</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM 요소 가져오기 ---
+        const websiteUrlInput = document.getElementById('website-url');
+        const fetchWebsiteButton = document.getElementById('fetch-website-button');
+        const websiteLoadingDiv = document.getElementById('website-loading');
+        const websiteStatusMsg = document.getElementById('website-status-message');
+        const websiteFoundLinksArea = document.getElementById('website-found-links-area');
+        const websiteFoundLinksList = document.getElementById('website-found-links-list');
+        const githubUrlInput = document.getElementById('github-url');
+        const fetchReadmeButton = document.getElementById('fetch-readme-button');
+        const githubLoadingDiv = document.getElementById('github-loading');
+        const githubStatusMsg = document.getElementById('github-status-message');
+        const githubFoundLinksArea = document.getElementById('github-found-links-area');
+        const githubFoundLinksList = document.getElementById('github-found-links-list');
+        const urlInput = document.getElementById('arxiv-url');
+        const fetchButton = document.getElementById('fetch-button');
+        const loadingDiv = document.getElementById('loading');
+        const resultsDiv = document.getElementById('results');
+        const errorDiv = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+        const paperTitle = document.getElementById('paper-title');
+        const paperAuthors = document.getElementById('paper-authors');
+        const paperAbstract = document.getElementById('paper-abstract');
+        // 바로가기 링크 요소 추가
+        const linkAbs = document.getElementById('link-abs');
+        const linkPdf = document.getElementById('link-pdf');
+        const linkHtml = document.getElementById('link-html');
+
+
+        // --- 공통 함수 ---
+        const arxivRegex = /https?:\/\/arxiv\.org\/(?:abs|pdf)\/([\w.-]+)/ig;
+
+        // arXiv ID로 제목 가져오는 함수 (API 호출)
+        async function fetchArxivTitle(arxivId) {
+            if (!arxivId) return null;
+            const apiUrl = `https://export.arxiv.org/api/query?id_list=${arxivId}&max_results=1`;
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error(`API ${response.status}`);
+                const xmlText = await response.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                const entry = xmlDoc.querySelector("entry");
+                const titleElement = entry?.querySelector("title");
+                return titleElement ? titleElement.textContent.trim().replace(/\s+/g, ' ') : null;
+            } catch (error) {
+                console.error(`Failed to fetch title for ${arxivId}:`, error);
+                return null;
+            }
+        }
+
+        // 찾은 링크 목록을 UI에 표시하는 함수 (제목 포함, 비동기 처리)
+        async function displayFoundLinksWithTitles(links, listElement, areaElement, sourceName) {
+            listElement.innerHTML = '<div class="text-center text-gray-500 text-sm p-2">논문 제목 로딩 중... <div class="loader-small"></div></div>';
+            areaElement.classList.remove('hidden');
+
+            if (!links || links.length === 0) {
+                listElement.innerHTML = '<div class="text-center text-gray-500 text-sm p-2">링크 없음</div>';
+                areaElement.classList.remove('hidden');
+                return 0;
+            }
+
+            const uniqueLinks = [...new Set(links)];
+            let fetchedCount = 0;
+
+            const titlePromises = uniqueLinks.map(async (link) => {
+                const arxivId = getArxivId(link);
+                const title = await fetchArxivTitle(arxivId);
+                return { link, title: title || "[제목 로드 실패]" };
+            });
+
+            try {
+                const results = await Promise.all(titlePromises);
+                fetchedCount = results.length;
+                listElement.innerHTML = '';
+
+                results.forEach(({ link, title }) => {
+                    const button = document.createElement('button');
+                    button.innerHTML = `
+                        <span class="title">${title}</span>
+                        <span class="url">${link}</span>
+                    `;
+                    button.dataset.url = link;
+                    button.onclick = (event) => {
+                        const clickedButton = event.currentTarget;
+                        urlInput.value = clickedButton.dataset.url;
+                        const allButtons = listElement.querySelectorAll('button');
+                        allButtons.forEach(btn => btn.classList.remove('selected'));
+                        clickedButton.classList.add('selected');
+                    };
+                    listElement.appendChild(button);
+                });
+
+            } catch (error) {
+                console.error("Error fetching titles:", error);
+                listElement.innerHTML = '<div class="text-center text-red-500 text-sm p-2">제목 로딩 중 오류 발생</div>';
+            }
+
+            return fetchedCount;
+        }
+
+
+        // --- 웹사이트 분석 관련 함수 ---
+        function showWebsiteStatus(message, isError = false) { /* ... */
+             websiteStatusMsg.textContent = message; websiteStatusMsg.className = isError ? 'error-message-inline' : 'success-message';
+        }
+        function setWebsiteLoading(isLoading) { /* ... */
+             websiteLoadingDiv.classList.toggle('hidden', !isLoading); fetchWebsiteButton.disabled = isLoading; if (isLoading) { websiteStatusMsg.textContent = ''; websiteFoundLinksArea.classList.add('hidden'); }
+        }
+        fetchWebsiteButton.addEventListener('click', async () => { /* ... 기존 웹사이트 분석 로직 (displayFoundLinksWithTitles 호출) ... */
+            const siteUrl = websiteUrlInput.value.trim(); if (!siteUrl || (!siteUrl.startsWith('http://') && !siteUrl.startsWith('https://'))) { showWebsiteStatus("유효한 웹사이트 주소를 입력해주세요.", true); websiteFoundLinksArea.classList.add('hidden'); return; } setWebsiteLoading(true); websiteFoundLinksList.innerHTML = ''; try { console.warn("Attempting direct fetch to external website. Relies on permissive CORS."); const response = await fetch(siteUrl); if (!response.ok) throw new Error(`웹사이트 (${response.status} ${response.statusText}) 접근 불가/오류`); const htmlContent = await response.text(); const parser = new DOMParser(); const doc = parser.parseFromString(htmlContent, 'text/html'); const links = doc.querySelectorAll('a'); const foundLinks = []; links.forEach(link => { const href = link.getAttribute('href'); if (href) { let absoluteHref = href; try { absoluteHref = new URL(href, siteUrl).href; } catch (e) { return; } let match; arxivRegex.lastIndex = 0; while ((match = arxivRegex.exec(absoluteHref)) !== null) { const arxivId = match[1].replace('.pdf', ''); const arxivAbsUrl = `https://arxiv.org/abs/${arxivId}`; foundLinks.push(arxivAbsUrl); } } }); const count = await displayFoundLinksWithTitles(foundLinks, websiteFoundLinksList, websiteFoundLinksArea, '웹사이트'); if (count > 0) { showWebsiteStatus(`${count}개의 arXiv 링크를 찾았습니다. 아래 목록에서 선택하세요.`, false); } else { showWebsiteStatus("웹사이트에서 arXiv 링크를 찾지 못했습니다.", true); } } catch (error) { console.error("웹사이트 분석 오류:", error); let userMessage = "웹사이트 분석 중 오류 발생."; if (error instanceof TypeError && error.message.includes('fetch')) { userMessage = "오류: 웹사이트 접근이 브라우저 보안(CORS)에 의해 차단됨. 대상 웹사이트 CORS 확인 또는 서버 프록시 필요."; } else { userMessage = `오류: ${error.message}`; } showWebsiteStatus(userMessage, true); websiteFoundLinksArea.classList.add('hidden'); } finally { setWebsiteLoading(false); }
+        });
+
+
+        // --- GitHub README 분석 관련 함수 ---
+        function parseGithubUrl(url) { /* ... */
+             try { const urlObj = new URL(url); if (urlObj.hostname !== 'github.com') return null; const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0); if (pathParts.length >= 2) return { owner: pathParts[0], repo: pathParts[1].replace('.git', '') }; return null; } catch (e) { console.error("GitHub URL 파싱 오류:", e); return null; }
+        }
+        function showGithubStatus(message, isError = false) { /* ... */
+            githubStatusMsg.textContent = message; githubStatusMsg.className = isError ? 'error-message-inline' : 'success-message';
+        }
+        function setGithubLoading(isLoading) { /* ... */
+             githubLoadingDiv.classList.toggle('hidden', !isLoading); fetchReadmeButton.disabled = isLoading; if (isLoading) { githubStatusMsg.textContent = ''; githubFoundLinksArea.classList.add('hidden'); }
+        }
+        fetchReadmeButton.addEventListener('click', async () => { /* ... 기존 GitHub 분석 로직 (displayFoundLinksWithTitles 호출) ... */
+            const githubUrl = githubUrlInput.value.trim(); if (!githubUrl) { showGithubStatus("GitHub 저장소 주소를 입력해주세요.", true); githubFoundLinksArea.classList.add('hidden'); return; } const repoInfo = parseGithubUrl(githubUrl); if (!repoInfo) { showGithubStatus("유효한 GitHub 저장소 주소 형식이 아닙니다.", true); githubFoundLinksArea.classList.add('hidden'); return; } setGithubLoading(true); githubFoundLinksList.innerHTML = ''; try { const apiUrl = `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/readme`; const response = await fetch(apiUrl, { headers: { 'Accept': 'application/vnd.github.v3+json' } }); if (!response.ok) { if (response.status === 404) throw new Error(`저장소/README 없음`); if (response.status === 403) throw new Error(`GitHub API 접근 제한`); throw new Error(`GitHub API 요청 실패: ${response.status}`); } const data = await response.json(); if (!data.content) throw new Error("README 내용 없음"); const readmeContent = atob(data.content); const foundLinks = []; let match; arxivRegex.lastIndex = 0; while ((match = arxivRegex.exec(readmeContent)) !== null) { const arxivId = match[1].replace('.pdf', ''); const arxivAbsUrl = `https://arxiv.org/abs/${arxivId}`; foundLinks.push(arxivAbsUrl); } const count = await displayFoundLinksWithTitles(foundLinks, githubFoundLinksList, githubFoundLinksArea, 'README'); if (count > 0) { showGithubStatus(`${count}개의 arXiv 링크를 찾았습니다. 아래 목록에서 선택하세요.`, false); } else { showGithubStatus("README 파일에서 arXiv 링크를 찾지 못했습니다.", true); } } catch (error) { console.error("GitHub README 분석 오류:", error); showGithubStatus(error.message || "README 분석 중 오류 발생", true); githubFoundLinksArea.classList.add('hidden'); } finally { setGithubLoading(false); }
+        });
+
+        // --- arXiv 정보 가져오기 관련 함수 ---
+        function getArxivId(url) { /* ... 기존 ID 추출 로직 ... */
+             try { const urlObj = new URL(url); const pathParts = urlObj.pathname.split('/'); const potentialId = pathParts[pathParts.length - 1]; const id = potentialId.replace('.pdf', ''); if (/^\d{4}\.\d{4,5}(v\d+)?$/.test(id) || /^[a-zA-Z\-]+?\/\d{7}(v\d+)?$/.test(id) || /^\d{7}(v\d+)?$/.test(id)) { return id; } console.warn("Invalid arXiv ID format detected from URL:", url, "Extracted ID:", id); return null; } catch (e) { console.error("URL parsing error or invalid URL:", url, e); return null; }
+        }
+        function setArxivLoading(isLoading) { /* ... */
+             loadingDiv.classList.toggle('hidden', !isLoading); fetchButton.disabled = isLoading;
+        }
+        function showError(message) { /* ... */
+            errorText.textContent = message; errorDiv.classList.remove('hidden'); resultsDiv.classList.add('hidden');
+        }
+        function hideError() { errorDiv.classList.add('hidden'); }
+
+        // 정보 가져오기 버튼 클릭 이벤트 리스너 (바로가기 링크 설정 추가)
+        fetchButton.addEventListener('click', async () => {
+             const url = urlInput.value.trim();
+             if (!url) { showError("먼저 분석할 arXiv 링크를 선택해주세요."); return; }
+             const arxivId = getArxivId(url);
+             if (!arxivId) { showError("선택된 arXiv 주소가 유효하지 않습니다."); return; }
+
+             hideError(); resultsDiv.classList.add('hidden');
+             setArxivLoading(true);
+
+             try {
+                 const apiUrl = `https://export.arxiv.org/api/query?id_list=${arxivId}&max_results=1`;
+                 const response = await fetch(apiUrl);
+                 if (!response.ok) throw new Error(`arXiv API 요청 실패: ${response.status} ${response.statusText}`);
+                 const xmlText = await response.text();
+                 const parser = new DOMParser(); const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                 const entry = xmlDoc.querySelector("entry");
+                 if (!entry) { /* ... (기존 오류 처리) ... */
+                     const errorElement = xmlDoc.querySelector("error"); if (errorElement) throw new Error(`arXiv API 오류: ${errorElement.textContent.trim()}`); throw new Error(`ID '${arxivId}'에 해당하는 논문을 찾을 수 없습니다.`);
+                 }
+                 const titleElement = entry.querySelector("title");
+                 const abstractElement = entry.querySelector("summary");
+                 const authorElements = entry.querySelectorAll("author");
+
+                 if (!titleElement || !abstractElement) throw new Error("논문 제목 또는 초록 정보를 가져올 수 없습니다.");
+
+                 const title = titleElement.textContent.trim().replace(/\s+/g, ' ');
+                 const abstract = abstractElement.textContent.trim().replace(/\s+/g, ' ');
+
+                 const authorsInfo = Array.from(authorElements).map(authorEl => {
+                     const name = authorEl.querySelector("name")?.textContent.trim();
+                     const affiliation = authorEl.querySelector("affiliation")?.textContent.trim();
+                     if (name && affiliation) { return `${name} (${affiliation})`; }
+                     else if (name) { return name; }
+                     return null;
+                 }).filter(info => info !== null);
+                 let authorsText = authorsInfo.join(', ');
+                 if (!authorsText) { authorsText = "저자 정보 없음"; }
+
+                 // 결과 표시
+                 paperTitle.textContent = title;
+                 paperAuthors.textContent = authorsText;
+                 paperAbstract.textContent = abstract;
+
+                 // 바로가기 링크 설정 (신규)
+                 const absUrl = `https://arxiv.org/abs/${arxivId}`;
+                 const pdfUrl = `https://arxiv.org/pdf/${arxivId}.pdf`;
+                 // ar5iv URL 생성 시 버전 정보 제거 (ar5iv는 버전 지정 없이 최신 버전을 보여주는 경향)
+                 const baseArxivId = arxivId.replace(/v\d+$/, ''); // 끝에 붙은 vN 제거
+                 const htmlUrl = `https://ar5iv.org/abs/${baseArxivId}`;
+
+                 if(linkAbs) linkAbs.href = absUrl;
+                 if(linkPdf) linkPdf.href = pdfUrl;
+                 if(linkHtml) linkHtml.href = htmlUrl;
+
+                 resultsDiv.classList.remove('hidden');
+             } catch (error) { /* ... (기존 오류 처리) ... */
+                 console.error("Fetch error:", error); let userMessage = "정보 가져오기 중 오류 발생."; if (error.message.includes("Failed to fetch")) userMessage = "네트워크 오류/CORS로 arXiv API 접근 불가."; else if (error.message.startsWith("arXiv API") || error.message.includes("논문을 찾을 수 없습니다")) userMessage = error.message; showError(userMessage);
+             } finally { setArxivLoading(false); }
+        });
+
+        // --- 입력 필드 Enter 키 처리 ---
+        websiteUrlInput.addEventListener('keypress', (event) => { if (event.key === 'Enter') { event.preventDefault(); fetchWebsiteButton.click(); } });
+        githubUrlInput.addEventListener('keypress', (event) => { if (event.key === 'Enter') { event.preventDefault(); fetchReadmeButton.click(); } });
+
+    </script>
+</body>
+</html>
